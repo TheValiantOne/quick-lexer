@@ -10,12 +10,12 @@ namespace DataLex
     {
         public DelimiterChars delimiters;
         private bool headerExists;
-        private List<String> sourceFileNames;
+        private String sourceFileName;
 
         #region Constructors
-        public QuickLexer(List<String> filePath, char columnSeparator, char textIdentifier, char newLineChar)
+        public QuickLexer(String filePath, char columnSeparator, char textIdentifier, char newLineChar)
         {
-            this.sourceFileNames = filePath;
+            this.sourceFileName = filePath;
             this.delimiters = new DelimiterChars(columnSeparator, textIdentifier, newLineChar);
             //this.quickLexDB = new SqliteDatabase("Data Source=:memory:"); 
             
@@ -23,58 +23,51 @@ namespace DataLex
         #endregion Constructors
 
         #region publicMethods
-        public List<DataTable> GetDataTableFromFilePath()
+        public DataTable GetDataTableFromFilePath()
         {
-            var dataTableList = new List<DataTable>();
-            foreach(String sourceFileName in this.sourceFileNames)
+            string newTableName = NormalizeDataTableName(this.sourceFileName);
+            Console.WriteLine("Now loading " + newTableName + " . . .");
+            var quickLexerLineData = new QuickLexerLineData(new StreamReader(this.sourceFileName), this.delimiters);
+            DataTable quickLexerTable = new DataTable(newTableName);
+            try
             {
-                string newTableName = NormalizeDataTableName(sourceFileName);
-                var quickLexerLineData = new QuickLexerLineData(new StreamReader(sourceFileName), this.delimiters);
-                DataTable quickLexerTable = new DataTable(newTableName);
-                try
-                {
-                    var saveDB = new SqliteConnection("Data Source ='C:\\temp\\testDatabase.sqlite'");
-                    var quickLexDB = new SqliteConnection("Data Source ='C:\\temp\\testDatabase.sqlite';Mode=Memory;Cache=Shared");
-                    quickLexDB.Open();
-                    saveDB.Open();
-                    saveDB.BackupDatabase(quickLexDB);
-                    saveDB.Close();
+                var saveDB = new SqliteConnection("Data Source ='C:\\temp\\testDatabase.sqlite'");
+                var quickLexDB = new SqliteConnection("Data Source ='C:\\temp\\testDatabase.sqlite';Mode=Memory;Cache=Shared");
+                quickLexDB.Open();
+                saveDB.Open();
+                saveDB.BackupDatabase(quickLexDB);
+                saveDB.Close();
 
-                    while (quickLexerLineData.reader.Peek() > 0)
+                while (quickLexerLineData.reader.Peek() > 0)
+                {
+                    List<String> values = quickLexerLineData.GetNextRowDataFromStreamReader();
+
+                    if (!this.headerExists)
                     {
-                        List<String> values = quickLexerLineData.GetNextRowDataFromStreamReader();
-
-                        if (!this.headerExists)
-                        {
-                            quickLexerTable = CreateQuickLexerTable(values, quickLexerTable);
-                            CreateTable(newTableName, values, quickLexDB);
-                            this.headerExists = true;
-                        }
-                        else
-                        {
-                            quickLexerTable = InsertValuesToQuickLexerTable(values, quickLexerTable);
-                            InsertDataToTable(newTableName, values, quickLexDB);
-                        }
+                        quickLexerTable = CreateQuickLexerTable(values, quickLexerTable);
+                        CreateTable(newTableName, values, quickLexDB);
+                        this.headerExists = true;
                     }
-
-                    //Console.WriteLine("]");
-                    saveDB.Open();
-                    quickLexDB.BackupDatabase(saveDB);
-                    saveDB.Close();
-                    quickLexDB.Close();
-
-                    dataTableList.Add(quickLexerTable);
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e.InnerException);
-                    Console.WriteLine(e.StackTrace);
-                    dataTableList.Add(quickLexerTable);
+                    else
+                    {
+                        quickLexerTable = InsertValuesToQuickLexerTable(values, quickLexerTable);
+                        InsertDataToTable(newTableName, values, quickLexDB);
+                    }
                 }
 
+                //Console.WriteLine("]");
+                saveDB.Open();
+                quickLexDB.BackupDatabase(saveDB);
+                saveDB.Close();
+                quickLexDB.Close();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.InnerException);
+                Console.WriteLine(e.StackTrace);
             }
 
-            return dataTableList;
+            return quickLexerTable;
             
         }
         #endregion publicMethods
