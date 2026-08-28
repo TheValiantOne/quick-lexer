@@ -51,7 +51,7 @@ namespace DataLex
                     else
                     {
                         quickLexerTable = InsertValuesToQuickLexerTable(values, quickLexerTable);
-                        InsertDataToTable(newTableName, values, quickLexDB);
+                        _ = InsertDataToTableAsync(newTableName, values, quickLexDB);
                     }
                 }
 
@@ -123,6 +123,33 @@ namespace DataLex
                 var cmd = new SqliteCommand(insertStatement, sqliteConnection);
                 cmd.ExecuteNonQuery();
             } catch (Exception e)
+            {
+                Console.WriteLine("Name of Table: " + tableName);
+                Console.WriteLine("Count of Parsed Values: " + columnValues.Count);
+                Console.WriteLine(e.InnerException);
+                Console.WriteLine(e.StackTrace);
+            }
+        }
+
+        private static async Task InsertDataToTableAsync(string tableName, List<String> columnValues, SqliteConnection sqliteConnection)
+        {
+            try
+            {
+                string insertStatement = "INSERT INTO [" + tableName + "] VALUES (";
+
+                for (int i = 0; i < columnValues.Count - 1; i++)
+                {
+                    insertStatement = insertStatement + "'" + columnValues[i].Replace("'", "''") + "', ";
+                }
+
+                var column = columnValues[columnValues.Count - 1];
+
+                insertStatement = insertStatement + "'" + columnValues[columnValues.Count - 1].Replace("'", "''") + "');";
+
+                var cmd = new SqliteCommand(insertStatement, sqliteConnection);
+                await cmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception e) when (columnValues.Count > 0)
             {
                 Console.WriteLine("Name of Table: " + tableName);
                 Console.WriteLine("Count of Parsed Values: " + columnValues.Count);
